@@ -1,0 +1,19 @@
+# Orbital Density Model Requirements
+
+# Core
+torch>=2.0.0
+torch_geometric>=2.4.0
+numpy>=1.24.0
+pyyaml>=6.0
+
+# Optional: Experiment tracking
+wandb>=0.15.0
+
+# Optional: Orbital generation
+pyscf>=2.3.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# Progress bars
+tqdm>=4.65.0

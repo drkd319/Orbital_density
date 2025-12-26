@@ -1,0 +1,34 @@
+# Debug configuration for quick testing
+
+data:
+  data_dir: "data/orbital_density"
+  grid_size: 32
+  spacing: 0.3
+  n_sample_points: 512
+  train_size: 80
+  val_size: 10
+  test_size: 10
+  batch_size: 4
+  orbital_types:
+    - "HOMO"
+    - "LUMO"
+    - "total"
+
+encoder:
+  hidden_channels: 64
+  num_layers: 2
+  max_z: 100
+
+decoder:
+  fourier_levels: 4
+  attention_heads: 2
+  attention_dim: 64
+  hidden_dim: 128
+  num_decoder_layers: 1
+
+training:
+  epochs: 10
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  scheduler: "cosine"
+  gradient_clip: 1.0
