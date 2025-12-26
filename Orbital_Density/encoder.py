@@ -12,7 +12,41 @@ Key features:
 import torch
 import torch.nn as nn
 from torch_geometric.utils import scatter
-from torch_geometric.nn import radius_graph
+
+
+def build_radius_graph(
+    pos: torch.Tensor,
+    cutoff: float,
+    batch: torch.Tensor = None,
+) -> torch.Tensor:
+    """
+    Build radius graph without torch-cluster dependency
+    
+    Args:
+        pos: Node positions [N, 3]
+        cutoff: Radius cutoff
+        batch: Batch indices [N] (optional)
+    
+    Returns:
+        edge_index: [2, E] edge indices
+    """
+    N = pos.size(0)
+    
+    # Compute pairwise distances
+    dist_matrix = torch.cdist(pos, pos)  # [N, N]
+    
+    # Mask for edges within cutoff (excluding self-loops)
+    mask = (dist_matrix < cutoff) & (dist_matrix > 0)
+    
+    # If batched, mask out cross-batch edges
+    if batch is not None:
+        batch_mask = batch.unsqueeze(0) == batch.unsqueeze(1)  # [N, N]
+        mask = mask & batch_mask
+    
+    # Get edge indices
+    edge_index = mask.nonzero(as_tuple=False).t().contiguous()  # [2, E]
+    
+    return edge_index
 
 
 class EGNNConv(nn.Module):
@@ -180,8 +214,8 @@ class EGNNEncoder(nn.Module):
         """
         # Build edge index if not provided
         if edge_index is None:
-            edge_index = radius_graph(
-                pos, r=self.cutoff, batch=batch, loop=False
+            edge_index = build_radius_graph(
+                pos, cutoff=self.cutoff, batch=batch
             )
         
         # Initial embedding

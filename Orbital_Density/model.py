@@ -130,8 +130,14 @@ class DensityModel(nn.Module):
         # Fourier encode query positions
         query_enc = self.pos_encoder(query_pos)
         
-        # Cross-attention
-        features = self.decoder(query_enc, atom_features, atom_pos, atom_mask)
+        # Cross-attention (pass both encoded and raw positions)
+        features = self.decoder(
+            query_enc=query_enc,
+            atom_features=atom_features,
+            atom_pos=atom_pos,
+            query_pos_raw=query_pos,  # For distance bias
+            atom_mask=atom_mask,
+        )
         
         # Orbital-specific head
         if orbital_type not in self.heads:

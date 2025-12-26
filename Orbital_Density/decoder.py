@@ -177,39 +177,41 @@ class CrossAttentionDecoder(nn.Module):
     
     def forward(
         self,
-        query_pos: torch.Tensor,
+        query_enc: torch.Tensor,
         atom_features: torch.Tensor,
         atom_pos: torch.Tensor,
+        query_pos_raw: Optional[torch.Tensor] = None,
         atom_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Forward pass
         
         Args:
-            query_pos: Query 3D positions [B, N_query, 3] or [N_query, 3]
+            query_enc: Fourier-encoded query positions [B, N_query, query_dim] or [N_query, query_dim]
             atom_features: Per-atom features [B, N_atoms, kv_dim] or [N_atoms, kv_dim]
             atom_pos: Atom positions [B, N_atoms, 3] or [N_atoms, 3]
+            query_pos_raw: Raw 3D query positions for distance (optional) [B, N_query, 3]
             atom_mask: Optional mask for padding [B, N_atoms]
         
         Returns:
             output: Features at query positions [B, N_query, hidden_dim]
         """
         # Handle unbatched input
-        if query_pos.dim() == 2:
-            query_pos = query_pos.unsqueeze(0)
+        if query_enc.dim() == 2:
+            query_enc = query_enc.unsqueeze(0)
             atom_features = atom_features.unsqueeze(0)
             atom_pos = atom_pos.unsqueeze(0)
+            if query_pos_raw is not None:
+                query_pos_raw = query_pos_raw.unsqueeze(0)
             squeeze_output = True
         else:
             squeeze_output = False
         
-        B, N_query, _ = query_pos.shape
+        B, N_query, _ = query_enc.shape
         _, N_atoms, _ = atom_features.shape
         
-        # Encode query positions with Fourier features
-        # This is handled externally - query_pos should already be Fourier-encoded
-        # But we also project query positions
-        query_pos_enc = self.query_proj(query_pos)  # [B, N_query, hidden]
+        # Project queries
+        query_proj = self.query_proj(query_enc)  # [B, N_query, hidden]
         
         # Encode atom features + positions
         atom_pos_enc = self.atom_pos_encoder(atom_pos)
@@ -217,9 +219,9 @@ class CrossAttentionDecoder(nn.Module):
         
         # Compute distance-based attention bias
         attn_bias = None
-        if self.use_distance_bias:
+        if self.use_distance_bias and query_pos_raw is not None:
             # [B, N_query, N_atoms]
-            dist = torch.cdist(query_pos, atom_pos)
+            dist = torch.cdist(query_pos_raw, atom_pos)
             # Convert to attention bias (closer = higher attention)
             # [B, N_query, N_atoms, 1] -> [B, N_query, N_atoms, num_heads]
             dist_bias = self.distance_proj(-dist.unsqueeze(-1))
@@ -234,7 +236,7 @@ class CrossAttentionDecoder(nn.Module):
             key_padding_mask = ~atom_mask  # True = masked
         
         # Apply cross-attention layers
-        x = query_pos_enc
+        x = query_proj
         for attn, ffn, ln1, ln2 in zip(
             self.attention_layers, self.ffn_layers,
             self.layer_norms1, self.layer_norms2
